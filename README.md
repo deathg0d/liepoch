@@ -120,5 +120,66 @@ Because 64-bit integers lose precision in JavaScript's floating-point numbers, t
 ## Ephemeral State & Restarts
 The singleton's state resides in memory. If your Node process crashes and restarts, it forgets its previous logical state. To guarantee absolute causality across process restarts in a high-throughput microservice, you should fetch the last known `liepoch` timestamp for this node from your database/store on boot, and pass it to `receive()` before processing new events.
 
+## Why not just use X?
+
+### `Date.now()`
+The default choice and the wrong one for distributed systems. It has two silent failure modes.
+
+**NTP drift** — physical clocks on different machines are never perfectly in sync. If Server A sends a message at `T=1000` and Worker B's clock is 15ms slow, Worker B records processing the message at `T=985`. Your logs now show the effect happening before the cause. Last-Write-Wins databases like Cassandra and DynamoDB will silently discard the newer write if it arrives on a node whose clock is behind.
+
+**Millisecond collisions** — `Date.now()` has millisecond precision. A Node.js event loop processing 50 events in a tight loop gives all 50 the exact same timestamp. Their true execution order is permanently lost.
+
+---
+
+### ULID / UUIDv7
+Time-based, lexicographically sortable unique identifiers. They are excellent primary keys, but they do not track causality. If Server A sends a message to Server B and Server B's clock is behind, its ULID/UUIDv7 will still sort before Server A's. The `receive()` function is what separates `liepoch` from these — it mathematically links cause and effect, so Server B's stamp is guaranteed to sort after Server A's regardless of physical clock drift.
+
+---
+
+### `process.hrtime.bigint()`
+Gives you nanosecond precision, but it measures time relative to an arbitrary point when the process started — not the Unix epoch. Server A booting on Monday and Server B booting on Tuesday produce hrtime values that are mathematically incomparable. It's also Node-only, so it doesn't work in Cloudflare Workers, Deno, Bun, or the browser. And higher precision doesn't fix NTP drift — if two machines disagree on what time it is, nanoseconds just make the disagreement more precise.
+
+---
+
+### Vector Clocks
+The academically correct solution. They guarantee perfect causal ordering with no physical clock dependency at all. The cost: every message must carry an array of counters, one per node in your cluster. With 50 microservices, your timestamp becomes a 50-element JSON array. It can't be stored in a database column, can't be indexed, and can't be compared with a less-than operator. Most teams that reach for vector clocks end up building significant infrastructure just to manage the timestamps themselves.
+
+---
+
+### Google Spanner / TrueTime
+The gold standard. Guarantees global wall-clock ordering using atomic clocks and GPS receivers wired directly into Google's data centers. Unless you are Google, this is not available to you.
+
+---
+
+### CockroachDB / YugabyteDB built-in HLCs
+These databases solve the problem internally using the same Hybrid Logical Clock algorithm that powers `liepoch`. The catch: it only applies to timestamps generated *inside* that database. The moment you're correlating events across two services, two databases, or a database and an event bus, you're back to `Date.now()` for everything outside.
+
+---
+
+### Other HLC npm packages
+Other implementations of the 2014 Kulkarni HLC paper exist, but most output complex JSON objects (`{ time: 123, logical: 1 }`) which break native database sorting, or native JS `BigInt`s which immediately crash `JSON.stringify()` in standard API responses. `liepoch` outputs a fixed-width, zero-padded hex string that survives JSON serialization without any conversion step and sorts correctly natively in Postgres, MySQL, MongoDB, and Redis without custom comparison plugins.
+
+---
+
+### `liepoch`
+`liepoch` takes the HLC algorithm that CockroachDB uses internally and makes it a zero-dependency primitive you can attach to any event, log line, or message — regardless of what database or framework you're using.
+
+The timestamp is a single 64-bit value serialized as a fixed-width hex string. It stores in a standard `BIGINT` column, travels in a JSON field or HTTP header without precision loss, sorts correctly in any database index with a plain `ORDER BY`, and compares with a single `<` operator. No cluster coordination, no schema changes, no infrastructure.
+
+| | Causal ordering | Single 64-bit value | Indexable | Works everywhere |
+|---|---|---|---|---|
+| `Date.now()` | ✗ | ✓ | ✓ | ✓ |
+| ULID / UUIDv7 | ✗ | ✓ | ✓ | ✓ |
+| `process.hrtime` | ✗ | ✓ | ✗ | ✗ |
+| Vector Clocks | ✓ | ✗ | ✗ | ✓ |
+| TrueTime | ✓ | ✓ | ✓ | ✗ |
+| DB-native HLC | ✓ | ✓ | ✓ | ✗ |
+| Other HLC packages | ✓ | ✗ | ✗ | ✗ |
+| **liepoch** | ✓ | ✓ | ✓ | ✓ |
+
+---
+
+> **One honest limitation worth knowing:** `liepoch` guarantees causality between events that are causally connected — meaning a message was sent and received. It does not provide a global total order for events on completely unrelated nodes that never communicate. If you need that, you need TrueTime or a consensus protocol like Raft. For the vast majority of microservice tracing, log correlation, and event ordering use cases, causal ordering is exactly what you need and total ordering is overkill.
+
 ## License
 MIT
