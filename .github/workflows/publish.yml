@@ -1,0 +1,38 @@
+name: Publish to npm
+
+# This workflow triggers whenever you publish a new Release in the GitHub UI
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    
+    # These permissions are required for npm provenance (a modern security feature)
+    permissions:
+      contents: read
+      id-token: write 
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Publish to npm
+        # Runs the build and publishes. 
+        # --provenance adds a cryptographic signature linking the package to this specific GitHub Action.
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
