@@ -1,6 +1,6 @@
 {
   "name": "liepoch",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Distributed timestamps that actually mean something. A zero-dependency Hybrid Logical Clock (HLC).",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
