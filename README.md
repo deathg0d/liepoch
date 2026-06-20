@@ -14,6 +14,8 @@ If `liepoch` becomes the standard, suddenly all your microservices, background w
 npm install liepoch
 ```
 
+[![npm version](https://badge.fury.io/js/liepoch.svg)](https://badge.fury.io/js/liepoch)
+
 ## The "Zero Ceremony" Guarantees
 Every distributed system rolls its own HLC, usually with fatal edge cases. `liepoch` is designed to be a foolproof drop-in primitive:
 * **JSON Safe:** Returns fixed-width hex strings (`"0000018f2a1b0001"`). No `TypeError: Do not know how to serialize a BigInt` crashes.
