@@ -1,9 +1,13 @@
 {
   "name": "liepoch",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Distributed timestamps that actually mean something. A zero-dependency Hybrid Logical Clock (HLC).",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/deathg0d/liepoch.git"
+  },
   "scripts": {
     "build": "tsc",
     "test": "node --import tsx --test",
