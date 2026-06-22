@@ -22,7 +22,7 @@
     "microservices",
     "logs"
   ],
-  "author": "Open Source Community",
+  "author": "deathg0d",
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^20.0.0",
